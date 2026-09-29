@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sims Preferences (Sparse Forced Choice)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; 
+        }
+        .choice-option {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            user-select: none;
+            border: 2px solid transparent;
+        }
+        .choice-option:hover {
+            border-color: #8b5cf6; /* Hover purple */
+        }
+        .choice-option.selected {
+            border-color: #4ade80; /* Green 400 */
+            background-color: #15803d; /* Green 700 */
+        }
+        .choice-option:focus {
+            /* Fix for persistent highlight bug on mobile/Safari */
+            outline: none;
+            box-shadow: none;
+        }
+        .main-container {
+            min-height: 100vh;
+        }
+        .summary-active #summary-content {
+            transform: scale(1);
+            opacity: 1;
+        }
+        /* Style for the button representing the option text */
+        .option-button {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-weight: 600;
+            background-color: #374151; /* Gray 700 */
+            color: white;
+        }
+        .trade-off-container .option-button {
+            font-size: 1.125rem; /* text-xl */
+            height: 100px; /* Ensure a large tap target */
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <div id="app" class="main-container flex flex-col items-center justify-start p-4 md:p-8">
+        
+        <header class="w-full max-w-lg mb-8 text-center pt-8">
+            <h1 class="text-3xl font-extrabold text-purple-400">Sims Gaming Priorities</h1>
+            <p class="text-gray-400 mt-2"><span id="exposure-description">  </span> Pick your preferred Sims priorities</p>
+            <div id="progress-bar" class="w-full bg-gray-700 rounded-full h-2.5 mt-4">
+                <div id="progress-indicator" class="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+            </div>
+        </header>
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="w-full max-w-lg flex flex-col items-center justify-center p-8 bg-gray-800 rounded-xl shadow-2xl space-y-8 hidden">
+            <h2 class="2xl font-bold text-white text-center">Quick Instructions</h2>
+            <p class="text-lg text-gray-300 text-center">
+                You will see <span id="pair-count">10</span> pairs of potential reasons or motivations for playing The Sims. For each pair, select the one motivation you would rather focus on or experience if you had to choose only one.
+                <br><br>Try to be accurate, but try to be fast too .
+            </p>
+            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white text-xl font-bold py-4 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
+                Start 
+            </button>
+        </div>
+
+        <!-- Comparison View -->
+        <div id="comparison-view" class="w-full max-w-lg flex flex-col items-center space-y-8 hidden">
+            <p id="comparison-text" class="text-lg font-semibold text-gray-300"></p>
+            
+            <div id="options-container" class="w-full flex flex-col space-y-3">
+                
+                <!-- Trade-Off Options (Side-by-Side) -->
+                <div id="trade-off-container" class="w-full flex justify-between space-x-3 trade-off-container">
+                    <!-- Buttons A and B generated here -->
+                </div>
+            </div>
+            
+            <p id="error-message" class="text-red-400 h-6"></p>
+        </div>
+
+        <!-- Summary View (Dedicated Screen) -->
+        <div id="summary-view" class="w-full max-w-lg mt-12 flex flex-col items-center p-4 hidden">
+            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full text-center transform scale-90 opacity-0 transition duration-500" id="summary-content">
+                <h3 class="text-3xl font-extrabold text-yellow-400 mb-6">Your Priority Snapshot</h3>
+                <p id="dynamic-summary-text" class="text-xl text-white leading-relaxed font-medium mb-8"></p>
+                
+                <button id="view-ranking-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold py-4 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
+                    View Full Priority Ranking
+                </button>
+            </div>
+        </div>
+
+        <!-- Results View -->
+        <div id="results-view" class="w-full max-w-lg mt-12 hidden">
+            <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Your Sims Priorities</h2>
+            
+            <!-- Score Table -->
+            <div id="score-block" class="bg-gray-800 rounded-xl p-4 shadow-xl mb-6">
+                <h3 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2">Utility Score Ranking</h3>
+                <div id="score-table-container">
+                    <!-- Scores and Bar Graphs injected here -->
+                </div>
+            </div>
+
+            <!-- Validation Step -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-2xl mt-8">
+                <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">How accurate is this for you?</h3>
+                <p class="text-gray-400 mb-4 text-center">Please rate the overall accuracy of this ranking:</p>
+                <div class="flex justify-between text-center mb-4 text-sm font-medium">
+                    <span>1 (Low)</span>
+                    <span>5 (High)</span>
+                </div>
+                <div id="validation-scale" class="flex justify-between space-x-2">
+                    <button data-value="1" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">1</button>
+                    <button data-value="2" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">2</button>
+                    <button data-value="3" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">3</button>
+                    <button data-value="4" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">4</button>
+                    <button data-value="5" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">5</button>
+                </div>
+                <p id="validation-feedback" class="text-center mt-4 h-5 text-purple-400"></p>
+            </div>
+            
+            <!-- CSV Button -->
+            <div class="flex flex-col space-y-4 mt-8">
+                <button id="download-csv-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
+                    Download Raw Data (CSV)
+                </button>
+            </div>
+
+            <p class="text-sm text-gray-500 mt-6 text-center">The full preference data (including original positive/negative utility) is saved in the CSV.</p>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration and State ---
+        // *** DYNAMICALLY SCALABLE CATEGORIES ***
+        // To change the number of items, just modify this array.
+        const CATEGORIES = [
+            'Building & creating', 
+            'Character creation', 
+            'Story & roleplay', 
+            'Skill progression', 
+            'Family building',
+			'Chaos & experimenting',
+			'Socializing',
+			'Exploring & discovery',
+			'Supernatural gameplay',
+			'Collecting items'
+            // Add more categories here to scale the assessment (e.g., 10 total items).
+        ];
+        
+        // *** INCOMPLETE BLOCK DESIGN CONFIGURATION ***
+        // Set how many times each item must appear in a comparison. 
+        // 10 items * 4 exposures / 2 items per pair = 20 comparisons total.
+        const EXPOSURE_COUNT = 4;
+
+        // Raw Score Constants (Pure Forced Choice: +2 Win, -2 Loss)
+        const SCORE_PREFERENCE_WIN = 2;
+        const SCORE_PREFERENCE_LOSS = -2;
+
+        // Function to dynamically generate a SPARSE set of pairs (Incomplete Block Design)
+        function generateSparsePairs(categories, exposureCount) {
+            const N = categories.length;
+            const pairs = [];
+            const exposureCounts = new Array(N).fill(0);
+            const usedPairs = new Set();
+            
+            const targetPairs = Math.ceil((N * exposureCount) / 2);
+            let attempts = 0;
+            const maxAttempts = N * N * exposureCount * 4; // Increased safeguard for aggressive generation
+
+            while (pairs.length < targetPairs && attempts < maxAttempts) {
+                attempts++;
+                
+                // 1. Identify underrepresented candidates (those who haven't met exposureCount)
+                let candidates = exposureCounts.map((count, index) => ({ count, index }))
+                    .filter(item => item.count < exposureCount)
+                    .sort((a, b) => a.count - b.count); // Sort by lowest count first
+
+                if (candidates.length === 0) break; 
+                
+                // Select Item A: prioritize the most underrepresented item(s)
+                let minCount = candidates[0].count;
+                let topCandidates = candidates.filter(c => c.count === minCount);
+                let indexA = topCandidates[Math.floor(Math.random() * topCandidates.length)].index;
+                
+                // 2. Find a valid opponent (Item B)
+                let indexB = -1;
+                let validOpponents = [];
+
+                for (let j = 0; j < N; j++) {
+                    if (j === indexA || exposureCounts[j] >= exposureCount) continue;
+
+                    const pairKey = indexA < j ? `${indexA},${j}` : `${j},${indexA}`;
+                    if (!usedPairs.has(pairKey)) {
+                        validOpponents.push(j);
+                    }
+                }
+
+                if (validOpponents.length > 0) {
+                    // Prioritize pairing A with an item (B) that is also underrepresented
+                    validOpponents.sort((idx1, idx2) => exposureCounts[idx1] - exposureCounts[idx2]);
+                    
+                    // Select one of the top two least exposed valid opponents
+                    const selectionPool = validOpponents.slice(0, 2); 
+                    indexB = selectionPool[Math.floor(Math.random() * selectionPool.length)];
+
+                    // Add the valid pair
+                    const pairKey = indexA < indexB ? `${indexA},${indexB}` : `${indexB},${indexA}`;
+                    pairs.push(indexA < indexB ? [indexA, indexB] : [indexB, indexA]);
+                    usedPairs.add(pairKey);
+                    
+                    exposureCounts[indexA]++;
+                    exposureCounts[indexB]++;
+                }
+            }
+
+            // Shuffle the final list of pairs before returning
+            return pairs;
+        }
+
+
+        const ALL_PAIRS = generateSparsePairs(CATEGORIES, EXPOSURE_COUNT);
+        
+        let startTime = 0;
+        let currentPairIndex = 0;
+        let comparisonData = []; // Stores { pair, winner, loser, latency, choiceType }
+        let validationScore = 'N/A'; 
+        
+        // DOM elements
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const comparisonView = document.getElementById('comparison-view');
+        const resultsView = document.getElementById('results-view');
+        const comparisonText = document.getElementById('comparison-text');
+        const tradeOffContainer = document.getElementById('trade-off-container');
+        const progressBar = document.getElementById('progress-indicator');
+        const downloadBtn = document.getElementById('download-csv-btn');
+        const summaryView = document.getElementById('summary-view'); 
+        const viewRankingBtn = document.getElementById('view-ranking-btn');
+        const errorMessage = document.getElementById('error-message');
+        const pairCountSpan = document.getElementById('pair-count');
+        const exposureDescriptionSpan = document.getElementById('exposure-description');
+
+
+        // Fisher-Yates Shuffle for randomization
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        shuffleArray(ALL_PAIRS);
+
+        // --- View Management ---
+        
+        function showStartScreen() {
+            // Update the pair count and exposure description in the start screen text
+            pairCountSpan.textContent = ALL_PAIRS.length;
+            <!--exposureDescriptionSpan.textContent = `${EXPOSURE_COUNT} exposures per item`; -->
+            
+            startScreen.classList.remove('hidden');
+            comparisonView.classList.add('hidden');
+            resultsView.classList.add('hidden');
+            summaryView.classList.add('hidden');
+        }
+
+        function startComparison() {
+            errorMessage.textContent = '';
+            
+            if (currentPairIndex >= ALL_PAIRS.length) {
+                comparisonView.classList.add('hidden');
+                showSummaryView();
+                return;
+            }
+
+            // Fix for Safari mobile highlight bug: Reset styles and blur everything
+            document.activeElement.blur(); 
+            document.querySelectorAll('.choice-option').forEach(el => el.classList.remove('selected'));
+
+            comparisonView.classList.remove('hidden'); 
+            startScreen.classList.add('hidden');
+
+            const totalComparisons = ALL_PAIRS.length;
+            const currentPair = ALL_PAIRS[currentPairIndex];
+            
+            // Randomly determine which category is left and which is right
+            let [indexA, indexB] = currentPair;
+            let isASideLeft = Math.random() > 0.5;
+            let leftIndex = isASideLeft ? indexA : indexB;
+            let rightIndex = isASideLeft ? indexB : indexA;
+            
+            const itemLeft = CATEGORIES[leftIndex];
+            const itemRight = CATEGORIES[rightIndex];
+            
+            comparisonText.textContent = `Which Sims motivation do you MOST prefer? (${currentPairIndex + 1} of ${totalComparisons})`;
+
+            tradeOffContainer.innerHTML = '';
+            
+            // Define the trade-off options based on displayed position
+            const tradeOffOptions = [
+                // Option 1: Left item wins
+                { text: itemLeft, value: 'LEFT_OVER_RIGHT', winner: leftIndex, loser: rightIndex },
+                // Option 2: Right item wins
+                { text: itemRight, value: 'RIGHT_OVER_LEFT', winner: rightIndex, loser: leftIndex }
+            ];
+
+            // Create side-by-side trade-off buttons
+            tradeOffOptions.forEach((opt) => {
+                const button = createOptionButton(opt.text, opt.value, opt.winner, opt.loser);
+                button.classList.add('flex-1'); // Make them equal width
+                tradeOffContainer.appendChild(button);
+            });
+            
+            // Record start time for latency
+            startTime = performance.now();
+            updateProgress();
+        }
+
+        function createOptionButton(htmlText, value, winnerIndex, loserIndex) {
+            const button = document.createElement('button');
+            button.className = 'choice-option option-button text-lg text-center';
+            button.textContent = htmlText;
+            button.setAttribute('data-value', value);
+            button.setAttribute('data-winner', winnerIndex);
+            button.setAttribute('data-loser', loserIndex);
+            
+            button.onclick = (e) => {
+                // Ensure only one button is selected
+                document.querySelectorAll('.choice-option').forEach(el => el.classList.remove('selected'));
+                button.classList.add('selected');
+                
+                recordChoice(value, winnerIndex, loserIndex);
+            };
+            return button;
+        }
+
+        function recordChoice(choiceType, winnerIndex, loserIndex) {
+            const endTime = performance.now();
+            const latency = Math.round(endTime - startTime); 
+            const currentPair = ALL_PAIRS[currentPairIndex];
+            
+            // Store data
+            comparisonData.push({
+                pair: currentPair,
+                choiceType: choiceType,
+                winner: winnerIndex,
+                loser: loserIndex,
+                latency: latency,
+            });
+
+            currentPairIndex++;
+            
+            // Advance to the next comparison after a slight delay to ensure click registers
+            setTimeout(() => {
+                document.activeElement.blur(); 
+                startComparison();
+            }, 50); 
+        }
+
+        function updateProgress() {
+            const totalComparisons = ALL_PAIRS.length;
+            const percent = (currentPairIndex / totalComparisons) * 100;
+            progressBar.style.width = `${percent}%`;
+        }
+
+        // --- Results and CSV Logic ---
+
+        function calculateScores() {
+            const scores = CATEGORIES.map((name, index) => ({
+                name: name,
+                index: index,
+                rawScore: 0,
+                weightedScore: 0,
+                normalizedScore: 0, 
+            }));
+
+            // 1. Calculate Average Latency (t_bar)
+            const totalLatency = comparisonData.reduce((sum, item) => sum + item.latency, 0);
+            const avgLatency = totalLatency / comparisonData.length;
+            
+            // 2. Process all choices to calculate raw and weighted scores
+            comparisonData.forEach(choice => {
+                const [indexA, indexB] = choice.pair;
+                
+                let scoreA = 0;
+                let scoreB = 0;
+
+                // Pure Forced Choice: +2 Win, -2 Loss
+                scoreA = (indexA === choice.winner) ? SCORE_PREFERENCE_WIN : SCORE_PREFERENCE_LOSS;
+                scoreB = (indexB === choice.winner) ? SCORE_PREFERENCE_WIN : SCORE_PREFERENCE_LOSS;
+                
+                // Calculate latency weight (W_L) - Friction Weight
+                // W_L = Avg Time / Individual Time
+                const latencyWeight = avgLatency / choice.latency;
+
+                // Apply score to categories
+                scores[indexA].rawScore += scoreA;
+                scores[indexB].rawScore += scoreB;
+                
+                scores[indexA].weightedScore += scoreA * latencyWeight;
+                scores[indexB].weightedScore += scoreB * latencyWeight;
+            });
+            
+            // 3. Normalization for Visualization (0-100 scale)
+            // Finds the minimum and maximum weighted scores to normalize the scale.
+            const minScore = scores.reduce((min, s) => s.weightedScore < min ? s.weightedScore : min, scores[0].weightedScore);
+            const maxScore = scores.reduce((max, s) => s.weightedScore > max ? s.weightedScore : max, scores[0].weightedScore);
+            const range = maxScore - minScore;
+
+            scores.forEach(s => {
+                if (range === 0) {
+                    s.normalizedScore = 50; 
+                } else {
+                    // Normalize: shifts the min score to 0 and scales to 100.
+                    s.normalizedScore = ((s.weightedScore - minScore) / range) * 100;
+                }
+            });
+
+            // Sort by final weighted score (descending)
+            scores.sort((a, b) => b.weightedScore - a.weightedScore);
+            
+            return { scores, avgLatency, minScore, maxScore };
+        }
+
+        // --- Summary View Logic ---
+
+        function showSummaryView() {
+            comparisonView.classList.add('hidden');
+            summaryView.classList.remove('hidden');
+            
+            const { scores } = calculateScores();
+
+            // Threshold: weightedScore > 0 means net positive utility (Above Threshold)
+            const positiveCategories = scores.filter(s => s.weightedScore > 0).map(s => s.name);
+            const negativeCategories = scores.filter(s => s.weightedScore <= 0).map(s => s.name);
+            
+            const summaryTextElement = document.getElementById('dynamic-summary-text');
+            
+            let likeText = '';
+            let dislikeText = '';
+
+            if (positiveCategories.length > 0) {
+                const lastPositive = positiveCategories.pop();
+                likeText = positiveCategories.length > 0
+                    ? `**${positiveCategories.join(', ')}** and **${lastPositive}**`
+                    : `**${lastPositive}**`;
+                
+                likeText = `Your top Sims priorities are ${likeText}.`;
+            } else {
+                likeText = `You are highly critical, showing no feature dominance.`;
+            }
+
+            if (negativeCategories.length > 0) {
+                const lastNegative = negativeCategories.pop();
+                dislikeText = negativeCategories.length > 0
+                    ? `${negativeCategories.join(', ')} and ${lastNegative}`
+                    : lastNegative;
+                
+                dislikeText = `You are less interested in **${dislikeText}** compared to your top choices .`;
+            }
+
+            summaryTextElement.innerHTML = `${likeText} ${dislikeText}`;
+            
+            setTimeout(() => {
+                summaryView.classList.add('summary-active');
+            }, 10); 
+
+            viewRankingBtn.onclick = showFinalRanking;
+        }
+
+        function handleValidationClick(event) {
+            const button = event.target.closest('.validation-button');
+            if (!button) return;
+
+            validationScore = button.getAttribute('data-value');
+            document.getElementById('validation-feedback').textContent = `Thanks! You rated the accuracy as ${validationScore}/5.`;
+            
+            document.querySelectorAll('.validation-button').forEach(b => {
+                b.disabled = true;
+                b.classList.remove('bg-purple-600');
+                b.classList.add('bg-gray-600');
+            });
+            button.classList.add('bg-purple-600');
+            button.classList.remove('bg-gray-600');
+        }
+
+        function showFinalRanking() {
+            summaryView.classList.add('hidden');
+            resultsView.classList.remove('hidden');
+
+            const { scores, avgLatency, minScore, maxScore } = calculateScores();
+
+            const tableContainer = document.getElementById('score-table-container');
+            let html = `
+                <div class="text-sm font-light text-gray-400 mb-4">
+                    <p class="mt-1">Rankings are based on your net preference and decision speed.</p>
+                </div>
+                <div class="space-y-3">
+            `;
+
+            scores.forEach((s, rank) => {
+                // Determine bar color based on the ORIGINAL weighted score
+                const barColor = s.weightedScore > 0 ? 'bg-purple-600' : 'bg-red-500';
+                const barWidth = s.normalizedScore.toFixed(0); 
+
+                html += `
+                    <div class="p-3 rounded-lg bg-gray-700 shadow-lg">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <span class="text-xl font-extrabold ${rank === 0 ? 'text-yellow-500' : 'text-gray-400'} w-6">${rank + 1}.</span>
+                            <span class="text-white font-semibold flex-1">${s.name}</span>
+                            <span class="text-xs text-gray-400">(${s.weightedScore.toFixed(2)})</span>
+                        </div>
+                        
+                        <!-- Bar Graph Visualization (Normalized 0-100) -->
+                        <div class="w-full bg-gray-600 rounded-full h-3">
+                            <div style="width: ${barWidth}%" class="${barColor} h-3 rounded-full transition-all duration-500 ease-out"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            tableContainer.innerHTML = html;
+
+            document.getElementById('validation-scale').addEventListener('click', handleValidationClick);
+            
+            downloadBtn.onclick = () => generateCSV(scores, comparisonData, minScore, maxScore, validationScore);
+        }
+
+        function generateCSV(finalScores, rawData, minScore, maxScore, validationScore) {
+            let csv = "--- Final Weighted Scores (Negative indicates net-rejection/below inferred threshold) ---\n";
+            csv += `User Accuracy Validation: ${validationScore}/5\n`;
+            csv += `Score Range (Min, Max): ${minScore.toFixed(2)}, ${maxScore.toFixed(2)}\n`;
+            csv += "Rank,Category,Weighted Score (Original),Raw Score,Normalized Score (0-100 for display)\n";
+            finalScores.forEach((s, rank) => {
+                csv += `${rank + 1},"${s.name}",${s.weightedScore.toFixed(2)},${s.rawScore},${s.normalizedScore.toFixed(2)}\n`;
+            });
+
+            csv += "\n--- Raw Comparison Data (Latency Weighted) ---\n";
+            csv += "Comparison #,Category 1,Category 2,Choice Type,Latency (ms),Weighted Score Applied\n";
+
+            const totalLatency = rawData.reduce((sum, item) => sum + item.latency, 0);
+            const avgLatency = totalLatency / rawData.length;
+
+            rawData.forEach((d, index) => {
+                const [indexA, indexB] = d.pair;
+                const weight = avgLatency / d.latency;
+                
+                csv += `${index + 1},"${CATEGORIES[indexA]}","${CATEGORIES[indexB]}",`;
+                csv += `${d.choiceType},${d.latency},${weight.toFixed(2)}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { 
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "ai_utility_preference_data.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            startBtn.onclick = startComparison;
+            showStartScreen();
+        });
+
+    </script>
+</body>
+</html>
