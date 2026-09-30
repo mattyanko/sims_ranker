@@ -1,0 +1,38 @@
+name: iOS app and model tests
+on:
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  push:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select an available iPhone simulator
+        run: |
+          xcrun simctl list devices available --json > /tmp/simulators.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          with open('/tmp/simulators.json') as source:
+              devices = json.load(source)['devices']
+          choices = [d for runtime, values in devices.items() if 'iOS' in runtime for d in values if d.get('isAvailable') and 'iPhone' in d['name']]
+          if not choices:
+              raise SystemExit('No available iPhone simulator')
+          print('DRAFT_SIMULATOR_ID=' + choices[0]['udid'])
+          PY
+      - name: Build and test
+        run: >-
+          xcodebuild test
+          -project ios/TasteDraft.xcodeproj
+          -scheme TasteDraft
+          -destination "platform=iOS Simulator,id=$DRAFT_SIMULATOR_ID"
+          -resultBundlePath /tmp/TasteDraft.xcresult
+          CODE_SIGNING_ALLOWED=NO
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TasteDraft-test-results
+          path: /tmp/TasteDraft.xcresult
