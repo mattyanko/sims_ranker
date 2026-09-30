@@ -1,587 +1,390 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sims Preferences (Sparse Forced Choice)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0d1117; 
-        }
-        .choice-option {
-            transition: all 0.2s ease;
-            cursor: pointer;
-            user-select: none;
-            border: 2px solid transparent;
-        }
-        .choice-option:hover {
-            border-color: #8b5cf6; /* Hover purple */
-        }
-        .choice-option.selected {
-            border-color: #4ade80; /* Green 400 */
-            background-color: #15803d; /* Green 700 */
-        }
-        .choice-option:focus {
-            /* Fix for persistent highlight bug on mobile/Safari */
-            outline: none;
-            box-shadow: none;
-        }
-        .main-container {
-            min-height: 100vh;
-        }
-        .summary-active #summary-content {
-            transform: scale(1);
-            opacity: 1;
-        }
-        /* Style for the button representing the option text */
-        .option-button {
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            text-align: center;
-            font-weight: 600;
-            background-color: #374151; /* Gray 700 */
-            color: white;
-        }
-        .trade-off-container .option-button {
-            font-size: 1.125rem; /* text-xl */
-            height: 100px; /* Ensure a large tap target */
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Sims Taste Draft</title>
+<style>
+:root { color-scheme: light dark; --bg:#f2f2f7; --surface:#fff; --ink:#171719; --muted:#63636b; --line:#d4d4db; --accent:#6452cc; --accent-soft:#efecff; --on-accent:#fff; }
+@media(prefers-color-scheme:dark) { :root { --bg:#000; --surface:#1c1c1e; --ink:#f5f5f7; --muted:#aeaeb6; --line:#414147; --accent:#bbafff; --accent-soft:#30294b; --on-accent:#181026; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:17px; line-height:1.45; -webkit-tap-highlight-color:transparent; }
+button { font:inherit; cursor:pointer; touch-action:manipulation; }
+button:disabled { opacity:.45; cursor:default; }
+button:focus-visible, a:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+[hidden] { display:none !important; }
+main { max-width:560px; margin:auto; padding:24px 20px max(24px,env(safe-area-inset-bottom)); }
+header { display:flex; align-items:center; gap:10px; padding-bottom:24px; }
+.mark { display:grid; place-items:center; width:36px; height:36px; border-radius:11px; background:var(--accent); color:var(--on-accent); font-size:23px; }
+.brand { font-weight:700; letter-spacing:-.4px; }
+h1 { font-size:clamp(26px,6vw,34px); line-height:1.16; letter-spacing:-.8px; margin:14px 0 10px; }
+h2 { font-size:21px; letter-spacing:-.3px; margin:0 0 16px; }
+p { margin:8px 0; }
+.muted { color:var(--muted); }
+.round-line { display:flex; justify-content:space-between; font-size:14px; font-weight:600; color:var(--muted); margin-bottom:10px; }
+progress { display:block; width:100%; height:5px; border:0; border-radius:10px; overflow:hidden; background:var(--line); accent-color:var(--accent); }
+progress::-webkit-progress-bar { background:var(--line); border-radius:10px; }
+progress::-webkit-progress-value { background:var(--accent); border-radius:10px; transition:width .25s; }
+progress::-moz-progress-bar { background:var(--accent); }
+.status { min-height:25px; font-size:15px; margin-bottom:18px; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.card { display:flex; flex-direction:column; align-items:flex-start; gap:18px; min-height:176px; width:100%; text-align:left; background:var(--surface); border:2px solid transparent; border-radius:18px; padding:17px; color:var(--ink); box-shadow:0 2px 6px #00000006; transition:border-color .18s, background .18s, transform .15s; overflow-wrap:anywhere; }
+.card:active { transform:scale(.97); }
+.card.ranked { border-color:var(--accent); background:var(--accent-soft); }
+.card-top { display:flex; align-items:center; justify-content:space-between; width:100%; }
+.icon { font-size:27px; line-height:1; }
+.badge { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--ink); color:var(--surface); font-weight:800; font-size:18px; }
+.badge:empty { visibility:hidden; }
+.badge.pop { animation:pop .25s ease-out; }
+.card-name { font-size:17px; line-height:1.3; font-weight:650; }
+.controls { display:flex; justify-content:space-between; gap:12px; margin-top:20px; }
+.secondary { border:1px solid var(--line); color:var(--ink); background:var(--surface); border-radius:12px; padding:11px 20px; min-height:46px; }
+.skip { color:var(--muted); background:none; border:none; display:block; margin:14px auto 0; min-height:48px; padding:10px; font-size:15px; text-decoration:underline; text-underline-offset:4px; }
+.hint { font-size:13px; color:var(--muted); text-align:center; margin-top:12px; }
+.enter { animation:enter .3s ease-out; }
+.reveal { background:var(--surface); border-radius:22px; padding:26px; margin-bottom:22px; }
+.trophy { font-size:44px; margin-bottom:20px; display:block; }
+.eyebrow { color:var(--accent); font-size:13px; font-weight:750; letter-spacing:1.3px; text-transform:uppercase; }
+.panel { background:var(--surface); border-radius:18px; padding:22px; margin-bottom:16px; }
+.score-row + .score-row { margin-top:21px; }
+.score-label { display:flex; align-items:baseline; gap:12px; margin-bottom:9px; }
+.position { color:var(--muted); font-size:15px; min-width:18px; font-weight:700; }
+.score-name { flex:1; font-weight:600; }
+.score-number { color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums; }
+.track { height:7px; background:var(--line); border-radius:8px; overflow:hidden; }
+.fill { height:100%; background:var(--accent); border-radius:8px; animation:grow .8s ease-out; transform-origin:left; }
+.primary { display:block; width:100%; min-height:50px; background:var(--accent); color:var(--on-accent); border:0; border-radius:13px; padding:13px; font-weight:650; margin:12px 0; }
+.wide { width:100%; margin:10px 0; }
+details summary { min-height:44px; cursor:pointer; font-weight:600; }
+.details-content { margin-top:18px; }
+.footnote { font-size:13px; line-height:1.5; color:var(--muted); }
+.share-status { font-size:14px; min-height:22px; color:var(--muted); }
+@keyframes pop { 0% { transform:scale(.5); } 65% { transform:scale(1.15); } 100% { transform:scale(1); } }
+@keyframes enter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes grow { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@media(max-width:360px) { main { padding:18px 12px; } .card { padding:12px; } }
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
+</style>
 </head>
-<body class="text-white">
+<body>
+<main>
+<header><span class="mark" aria-hidden="true">✦</span><span class="brand" id="brand">Sims Taste Draft</span></header>
+<section id="round-view" aria-labelledby="instruction">
+  <div class="round-line"><span id="round-counter"></span><span>YOUR TASTE, YOUR RULES</span></div>
+  <progress id="progress" value="0" max="7" aria-label="Draft progress"></progress>
+  <h1 id="instruction" tabindex="-1">Tap your favorites in order</h1>
+  <p class="status muted" id="rank-status" role="status" aria-live="polite" aria-atomic="true">0 of 4 ranked</p>
+  <div class="grid" id="cards"></div>
+  <div class="controls"><button class="secondary" id="undo" disabled>↶ Undo</button><button class="secondary" id="reset" disabled>Reset round</button></div>
+  <button class="skip" id="skip">Skip round — unfamiliar items</button>
+  <p class="hint">Tap a numbered card to remove its rank.</p>
+</section>
+<section id="results-view" aria-labelledby="persona" hidden>
+  <div class="reveal enter">
+    <span class="trophy" aria-hidden="true">✦</span>
+    <p class="eyebrow">Your taste profile</p>
+    <h1 id="persona" tabindex="-1"></h1>
+    <p id="profile-description" class="muted"></p>
+  </div>
+  <div class="panel" id="top-panel"><h2>Your top picks</h2><div id="top-scores"></div></div>
+  <details class="panel" id="full-panel"><summary>Full priority ranking</summary><div class="details-content" id="all-scores"></div></details>
+  <p class="footnote" id="score-note">Bars show relative preference strength, with your leading item set to 100. They aren’t confidence or liking percentages. Close scores can change with more rounds.</p>
+  <button class="primary" id="share">Share taste profile</button>
+  <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
+  <button class="secondary wide" id="export">Download rankings (CSV)</button>
+  <button class="secondary wide" id="restart">Play again</button>
+</section>
+<section id="error-view" hidden><h1>Check your item set</h1><p id="error-message"></p></section>
+<noscript>This preference draft needs JavaScript enabled.</noscript>
+</main>
+<script>
+'use strict';
+// RESKIN HERE: change this title, round count, and item set. IDs must be unique.
+const CONFIG = {
+  title: 'Sims Taste Draft',
+  rounds: 7,
+  items: [
+    {id:'building', name:'Building & creating', icon:'🏡', persona:'The Architect'},
+    {id:'characters', name:'Character creation', icon:'🧑', persona:'The Character Designer'},
+    {id:'story', name:'Story & roleplay', icon:'📖', persona:'The Storyteller'},
+    {id:'skills', name:'Skill progression', icon:'📈', persona:'The Achiever'},
+    {id:'family', name:'Family building', icon:'👪', persona:'The Legacy Builder'},
+    {id:'chaos', name:'Chaos & experimenting', icon:'🔥', persona:'The Chaos Creator'},
+    {id:'social', name:'Socializing', icon:'💬', persona:'The Connector'},
+    {id:'exploring', name:'Exploring & discovery', icon:'🧭', persona:'The Explorer'},
+    {id:'supernatural', name:'Supernatural gameplay', icon:'✨', persona:'The Dreamer'},
+    {id:'collecting', name:'Collecting items', icon:'🗂️', persona:'The Collector'}
+  ]
+};
 
-    <div id="app" class="main-container flex flex-col items-center justify-start p-4 md:p-8">
-        
-        <header class="w-full max-w-lg mb-8 text-center pt-8">
-            <h1 class="text-3xl font-extrabold text-purple-400">Sims Gaming Priorities</h1>
-            <p class="text-gray-400 mt-2"><span id="exposure-description">  </span> Pick your preferred Sims priorities</p>
-            <div id="progress-bar" class="w-full bg-gray-700 rounded-full h-2.5 mt-4">
-                <div id="progress-indicator" class="bg-purple-500 h-2.5 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
-            </div>
-        </header>
-        
-        <!-- Start Screen -->
-        <div id="start-screen" class="w-full max-w-lg flex flex-col items-center justify-center p-8 bg-gray-800 rounded-xl shadow-2xl space-y-8 hidden">
-            <h2 class="2xl font-bold text-white text-center">Quick Instructions</h2>
-            <p class="text-lg text-gray-300 text-center">
-                You will see <span id="pair-count">10</span> pairs of potential reasons or motivations for playing The Sims. For each pair, select the one motivation you would rather focus on or experience if you had to choose only one.
-                <br><br>Try to be accurate, but try to be fast too .
-            </p>
-            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white text-xl font-bold py-4 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
-                Start 
-            </button>
-        </div>
-
-        <!-- Comparison View -->
-        <div id="comparison-view" class="w-full max-w-lg flex flex-col items-center space-y-8 hidden">
-            <p id="comparison-text" class="text-lg font-semibold text-gray-300"></p>
-            
-            <div id="options-container" class="w-full flex flex-col space-y-3">
-                
-                <!-- Trade-Off Options (Side-by-Side) -->
-                <div id="trade-off-container" class="w-full flex justify-between space-x-3 trade-off-container">
-                    <!-- Buttons A and B generated here -->
-                </div>
-            </div>
-            
-            <p id="error-message" class="text-red-400 h-6"></p>
-        </div>
-
-        <!-- Summary View (Dedicated Screen) -->
-        <div id="summary-view" class="w-full max-w-lg mt-12 flex flex-col items-center p-4 hidden">
-            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full text-center transform scale-90 opacity-0 transition duration-500" id="summary-content">
-                <h3 class="text-3xl font-extrabold text-yellow-400 mb-6">Your Priority Snapshot</h3>
-                <p id="dynamic-summary-text" class="text-xl text-white leading-relaxed font-medium mb-8"></p>
-                
-                <button id="view-ranking-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold py-4 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
-                    View Full Priority Ranking
-                </button>
-            </div>
-        </div>
-
-        <!-- Results View -->
-        <div id="results-view" class="w-full max-w-lg mt-12 hidden">
-            <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Your Sims Priorities</h2>
-            
-            <!-- Score Table -->
-            <div id="score-block" class="bg-gray-800 rounded-xl p-4 shadow-xl mb-6">
-                <h3 class="text-xl font-semibold mb-3 border-b border-gray-700 pb-2">Utility Score Ranking</h3>
-                <div id="score-table-container">
-                    <!-- Scores and Bar Graphs injected here -->
-                </div>
-            </div>
-
-            <!-- Validation Step -->
-            <div class="bg-gray-800 rounded-xl p-6 shadow-2xl mt-8">
-                <h3 class="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">How accurate is this for you?</h3>
-                <p class="text-gray-400 mb-4 text-center">Please rate the overall accuracy of this ranking:</p>
-                <div class="flex justify-between text-center mb-4 text-sm font-medium">
-                    <span>1 (Low)</span>
-                    <span>5 (High)</span>
-                </div>
-                <div id="validation-scale" class="flex justify-between space-x-2">
-                    <button data-value="1" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">1</button>
-                    <button data-value="2" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">2</button>
-                    <button data-value="3" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">3</button>
-                    <button data-value="4" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">4</button>
-                    <button data-value="5" class="flex-1 p-3 bg-gray-600 hover:bg-purple-600 rounded-lg text-lg font-bold transition duration-150 ease-in-out validation-button">5</button>
-                </div>
-                <p id="validation-feedback" class="text-center mt-4 h-5 text-purple-400"></p>
-            </div>
-            
-            <!-- CSV Button -->
-            <div class="flex flex-col space-y-4 mt-8">
-                <button id="download-csv-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-150 ease-in-out">
-                    Download Raw Data (CSV)
-                </button>
-            </div>
-
-            <p class="text-sm text-gray-500 mt-6 text-center">The full preference data (including original positive/negative utility) is saved in the CSV.</p>
-        </div>
-    </div>
-
-    <script>
-        // --- Configuration and State ---
-        // *** DYNAMICALLY SCALABLE CATEGORIES ***
-        // To change the number of items, just modify this array.
-        const CATEGORIES = [
-            'Building & creating', 
-            'Character creation', 
-            'Story & roleplay', 
-            'Skill progression', 
-            'Family building',
-			'Chaos & experimenting',
-			'Socializing',
-			'Exploring & discovery',
-			'Supernatural gameplay',
-			'Collecting items'
-            // Add more categories here to scale the assessment (e.g., 10 total items).
-        ];
-        
-        // *** INCOMPLETE BLOCK DESIGN CONFIGURATION ***
-        // Set how many times each item must appear in a comparison. 
-        // 10 items * 4 exposures / 2 items per pair = 20 comparisons total.
-        const EXPOSURE_COUNT = 4;
-
-        // Raw Score Constants (Pure Forced Choice: +2 Win, -2 Loss)
-        const SCORE_PREFERENCE_WIN = 2;
-        const SCORE_PREFERENCE_LOSS = -2;
-
-        // Function to dynamically generate a SPARSE set of pairs (Incomplete Block Design)
-        function generateSparsePairs(categories, exposureCount) {
-            const N = categories.length;
-            const pairs = [];
-            const exposureCounts = new Array(N).fill(0);
-            const usedPairs = new Set();
-            
-            const targetPairs = Math.ceil((N * exposureCount) / 2);
-            let attempts = 0;
-            const maxAttempts = N * N * exposureCount * 4; // Increased safeguard for aggressive generation
-
-            while (pairs.length < targetPairs && attempts < maxAttempts) {
-                attempts++;
-                
-                // 1. Identify underrepresented candidates (those who haven't met exposureCount)
-                let candidates = exposureCounts.map((count, index) => ({ count, index }))
-                    .filter(item => item.count < exposureCount)
-                    .sort((a, b) => a.count - b.count); // Sort by lowest count first
-
-                if (candidates.length === 0) break; 
-                
-                // Select Item A: prioritize the most underrepresented item(s)
-                let minCount = candidates[0].count;
-                let topCandidates = candidates.filter(c => c.count === minCount);
-                let indexA = topCandidates[Math.floor(Math.random() * topCandidates.length)].index;
-                
-                // 2. Find a valid opponent (Item B)
-                let indexB = -1;
-                let validOpponents = [];
-
-                for (let j = 0; j < N; j++) {
-                    if (j === indexA || exposureCounts[j] >= exposureCount) continue;
-
-                    const pairKey = indexA < j ? `${indexA},${j}` : `${j},${indexA}`;
-                    if (!usedPairs.has(pairKey)) {
-                        validOpponents.push(j);
-                    }
-                }
-
-                if (validOpponents.length > 0) {
-                    // Prioritize pairing A with an item (B) that is also underrepresented
-                    validOpponents.sort((idx1, idx2) => exposureCounts[idx1] - exposureCounts[idx2]);
-                    
-                    // Select one of the top two least exposed valid opponents
-                    const selectionPool = validOpponents.slice(0, 2); 
-                    indexB = selectionPool[Math.floor(Math.random() * selectionPool.length)];
-
-                    // Add the valid pair
-                    const pairKey = indexA < indexB ? `${indexA},${indexB}` : `${indexB},${indexA}`;
-                    pairs.push(indexA < indexB ? [indexA, indexB] : [indexB, indexA]);
-                    usedPairs.add(pairKey);
-                    
-                    exposureCounts[indexA]++;
-                    exposureCounts[indexB]++;
-                }
-            }
-
-            // Shuffle the final list of pairs before returning
-            return pairs;
-        }
-
-
-        const ALL_PAIRS = generateSparsePairs(CATEGORIES, EXPOSURE_COUNT);
-        
-        let startTime = 0;
-        let currentPairIndex = 0;
-        let comparisonData = []; // Stores { pair, winner, loser, latency, choiceType }
-        let validationScore = 'N/A'; 
-        
-        // DOM elements
-        const startScreen = document.getElementById('start-screen');
-        const startBtn = document.getElementById('start-btn');
-        const comparisonView = document.getElementById('comparison-view');
-        const resultsView = document.getElementById('results-view');
-        const comparisonText = document.getElementById('comparison-text');
-        const tradeOffContainer = document.getElementById('trade-off-container');
-        const progressBar = document.getElementById('progress-indicator');
-        const downloadBtn = document.getElementById('download-csv-btn');
-        const summaryView = document.getElementById('summary-view'); 
-        const viewRankingBtn = document.getElementById('view-ranking-btn');
-        const errorMessage = document.getElementById('error-message');
-        const pairCountSpan = document.getElementById('pair-count');
-        const exposureDescriptionSpan = document.getElementById('exposure-description');
-
-
-        // Fisher-Yates Shuffle for randomization
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-        
-        shuffleArray(ALL_PAIRS);
-
-        // --- View Management ---
-        
-        function showStartScreen() {
-            // Update the pair count and exposure description in the start screen text
-            pairCountSpan.textContent = ALL_PAIRS.length;
-            <!--exposureDescriptionSpan.textContent = `${EXPOSURE_COUNT} exposures per item`; -->
-            
-            startScreen.classList.remove('hidden');
-            comparisonView.classList.add('hidden');
-            resultsView.classList.add('hidden');
-            summaryView.classList.add('hidden');
-        }
-
-        function startComparison() {
-            errorMessage.textContent = '';
-            
-            if (currentPairIndex >= ALL_PAIRS.length) {
-                comparisonView.classList.add('hidden');
-                showSummaryView();
-                return;
-            }
-
-            // Fix for Safari mobile highlight bug: Reset styles and blur everything
-            document.activeElement.blur(); 
-            document.querySelectorAll('.choice-option').forEach(el => el.classList.remove('selected'));
-
-            comparisonView.classList.remove('hidden'); 
-            startScreen.classList.add('hidden');
-
-            const totalComparisons = ALL_PAIRS.length;
-            const currentPair = ALL_PAIRS[currentPairIndex];
-            
-            // Randomly determine which category is left and which is right
-            let [indexA, indexB] = currentPair;
-            let isASideLeft = Math.random() > 0.5;
-            let leftIndex = isASideLeft ? indexA : indexB;
-            let rightIndex = isASideLeft ? indexB : indexA;
-            
-            const itemLeft = CATEGORIES[leftIndex];
-            const itemRight = CATEGORIES[rightIndex];
-            
-            comparisonText.textContent = `Which Sims motivation do you MOST prefer? (${currentPairIndex + 1} of ${totalComparisons})`;
-
-            tradeOffContainer.innerHTML = '';
-            
-            // Define the trade-off options based on displayed position
-            const tradeOffOptions = [
-                // Option 1: Left item wins
-                { text: itemLeft, value: 'LEFT_OVER_RIGHT', winner: leftIndex, loser: rightIndex },
-                // Option 2: Right item wins
-                { text: itemRight, value: 'RIGHT_OVER_LEFT', winner: rightIndex, loser: leftIndex }
-            ];
-
-            // Create side-by-side trade-off buttons
-            tradeOffOptions.forEach((opt) => {
-                const button = createOptionButton(opt.text, opt.value, opt.winner, opt.loser);
-                button.classList.add('flex-1'); // Make them equal width
-                tradeOffContainer.appendChild(button);
-            });
-            
-            // Record start time for latency
-            startTime = performance.now();
-            updateProgress();
-        }
-
-        function createOptionButton(htmlText, value, winnerIndex, loserIndex) {
-            const button = document.createElement('button');
-            button.className = 'choice-option option-button text-lg text-center';
-            button.textContent = htmlText;
-            button.setAttribute('data-value', value);
-            button.setAttribute('data-winner', winnerIndex);
-            button.setAttribute('data-loser', loserIndex);
-            
-            button.onclick = (e) => {
-                // Ensure only one button is selected
-                document.querySelectorAll('.choice-option').forEach(el => el.classList.remove('selected'));
-                button.classList.add('selected');
-                
-                recordChoice(value, winnerIndex, loserIndex);
-            };
-            return button;
-        }
-
-        function recordChoice(choiceType, winnerIndex, loserIndex) {
-            const endTime = performance.now();
-            const latency = Math.round(endTime - startTime); 
-            const currentPair = ALL_PAIRS[currentPairIndex];
-            
-            // Store data
-            comparisonData.push({
-                pair: currentPair,
-                choiceType: choiceType,
-                winner: winnerIndex,
-                loser: loserIndex,
-                latency: latency,
-            });
-
-            currentPairIndex++;
-            
-            // Advance to the next comparison after a slight delay to ensure click registers
-            setTimeout(() => {
-                document.activeElement.blur(); 
-                startComparison();
-            }, 50); 
-        }
-
-        function updateProgress() {
-            const totalComparisons = ALL_PAIRS.length;
-            const percent = (currentPairIndex / totalComparisons) * 100;
-            progressBar.style.width = `${percent}%`;
-        }
-
-        // --- Results and CSV Logic ---
-
-        function calculateScores() {
-            const scores = CATEGORIES.map((name, index) => ({
-                name: name,
-                index: index,
-                rawScore: 0,
-                weightedScore: 0,
-                normalizedScore: 0, 
-            }));
-
-            // 1. Calculate Average Latency (t_bar)
-            const totalLatency = comparisonData.reduce((sum, item) => sum + item.latency, 0);
-            const avgLatency = totalLatency / comparisonData.length;
-            
-            // 2. Process all choices to calculate raw and weighted scores
-            comparisonData.forEach(choice => {
-                const [indexA, indexB] = choice.pair;
-                
-                let scoreA = 0;
-                let scoreB = 0;
-
-                // Pure Forced Choice: +2 Win, -2 Loss
-                scoreA = (indexA === choice.winner) ? SCORE_PREFERENCE_WIN : SCORE_PREFERENCE_LOSS;
-                scoreB = (indexB === choice.winner) ? SCORE_PREFERENCE_WIN : SCORE_PREFERENCE_LOSS;
-                
-                // Calculate latency weight (W_L) - Friction Weight
-                // W_L = Avg Time / Individual Time
-                const latencyWeight = avgLatency / choice.latency;
-
-                // Apply score to categories
-                scores[indexA].rawScore += scoreA;
-                scores[indexB].rawScore += scoreB;
-                
-                scores[indexA].weightedScore += scoreA * latencyWeight;
-                scores[indexB].weightedScore += scoreB * latencyWeight;
-            });
-            
-            // 3. Normalization for Visualization (0-100 scale)
-            // Finds the minimum and maximum weighted scores to normalize the scale.
-            const minScore = scores.reduce((min, s) => s.weightedScore < min ? s.weightedScore : min, scores[0].weightedScore);
-            const maxScore = scores.reduce((max, s) => s.weightedScore > max ? s.weightedScore : max, scores[0].weightedScore);
-            const range = maxScore - minScore;
-
-            scores.forEach(s => {
-                if (range === 0) {
-                    s.normalizedScore = 50; 
-                } else {
-                    // Normalize: shifts the min score to 0 and scales to 100.
-                    s.normalizedScore = ((s.weightedScore - minScore) / range) * 100;
-                }
-            });
-
-            // Sort by final weighted score (descending)
-            scores.sort((a, b) => b.weightedScore - a.weightedScore);
-            
-            return { scores, avgLatency, minScore, maxScore };
-        }
-
-        // --- Summary View Logic ---
-
-        function showSummaryView() {
-            comparisonView.classList.add('hidden');
-            summaryView.classList.remove('hidden');
-            
-            const { scores } = calculateScores();
-
-            // Threshold: weightedScore > 0 means net positive utility (Above Threshold)
-            const positiveCategories = scores.filter(s => s.weightedScore > 0).map(s => s.name);
-            const negativeCategories = scores.filter(s => s.weightedScore <= 0).map(s => s.name);
-            
-            const summaryTextElement = document.getElementById('dynamic-summary-text');
-            
-            let likeText = '';
-            let dislikeText = '';
-
-            if (positiveCategories.length > 0) {
-                const lastPositive = positiveCategories.pop();
-                likeText = positiveCategories.length > 0
-                    ? `**${positiveCategories.join(', ')}** and **${lastPositive}**`
-                    : `**${lastPositive}**`;
-                
-                likeText = `Your top Sims priorities are ${likeText}.`;
-            } else {
-                likeText = `You are highly critical, showing no feature dominance.`;
-            }
-
-            if (negativeCategories.length > 0) {
-                const lastNegative = negativeCategories.pop();
-                dislikeText = negativeCategories.length > 0
-                    ? `${negativeCategories.join(', ')} and ${lastNegative}`
-                    : lastNegative;
-                
-                dislikeText = `You are less interested in **${dislikeText}** compared to your top choices .`;
-            }
-
-            summaryTextElement.innerHTML = `${likeText} ${dislikeText}`;
-            
-            setTimeout(() => {
-                summaryView.classList.add('summary-active');
-            }, 10); 
-
-            viewRankingBtn.onclick = showFinalRanking;
-        }
-
-        function handleValidationClick(event) {
-            const button = event.target.closest('.validation-button');
-            if (!button) return;
-
-            validationScore = button.getAttribute('data-value');
-            document.getElementById('validation-feedback').textContent = `Thanks! You rated the accuracy as ${validationScore}/5.`;
-            
-            document.querySelectorAll('.validation-button').forEach(b => {
-                b.disabled = true;
-                b.classList.remove('bg-purple-600');
-                b.classList.add('bg-gray-600');
-            });
-            button.classList.add('bg-purple-600');
-            button.classList.remove('bg-gray-600');
-        }
-
-        function showFinalRanking() {
-            summaryView.classList.add('hidden');
-            resultsView.classList.remove('hidden');
-
-            const { scores, avgLatency, minScore, maxScore } = calculateScores();
-
-            const tableContainer = document.getElementById('score-table-container');
-            let html = `
-                <div class="text-sm font-light text-gray-400 mb-4">
-                    <p class="mt-1">Rankings are based on your net preference and decision speed.</p>
-                </div>
-                <div class="space-y-3">
-            `;
-
-            scores.forEach((s, rank) => {
-                // Determine bar color based on the ORIGINAL weighted score
-                const barColor = s.weightedScore > 0 ? 'bg-purple-600' : 'bg-red-500';
-                const barWidth = s.normalizedScore.toFixed(0); 
-
-                html += `
-                    <div class="p-3 rounded-lg bg-gray-700 shadow-lg">
-                        <div class="flex items-center space-x-3 mb-2">
-                            <span class="text-xl font-extrabold ${rank === 0 ? 'text-yellow-500' : 'text-gray-400'} w-6">${rank + 1}.</span>
-                            <span class="text-white font-semibold flex-1">${s.name}</span>
-                            <span class="text-xs text-gray-400">(${s.weightedScore.toFixed(2)})</span>
-                        </div>
-                        
-                        <!-- Bar Graph Visualization (Normalized 0-100) -->
-                        <div class="w-full bg-gray-600 rounded-full h-3">
-                            <div style="width: ${barWidth}%" class="${barColor} h-3 rounded-full transition-all duration-500 ease-out"></div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            tableContainer.innerHTML = html;
-
-            document.getElementById('validation-scale').addEventListener('click', handleValidationClick);
-            
-            downloadBtn.onclick = () => generateCSV(scores, comparisonData, minScore, maxScore, validationScore);
-        }
-
-        function generateCSV(finalScores, rawData, minScore, maxScore, validationScore) {
-            let csv = "--- Final Weighted Scores (Negative indicates net-rejection/below inferred threshold) ---\n";
-            csv += `User Accuracy Validation: ${validationScore}/5\n`;
-            csv += `Score Range (Min, Max): ${minScore.toFixed(2)}, ${maxScore.toFixed(2)}\n`;
-            csv += "Rank,Category,Weighted Score (Original),Raw Score,Normalized Score (0-100 for display)\n";
-            finalScores.forEach((s, rank) => {
-                csv += `${rank + 1},"${s.name}",${s.weightedScore.toFixed(2)},${s.rawScore},${s.normalizedScore.toFixed(2)}\n`;
-            });
-
-            csv += "\n--- Raw Comparison Data (Latency Weighted) ---\n";
-            csv += "Comparison #,Category 1,Category 2,Choice Type,Latency (ms),Weighted Score Applied\n";
-
-            const totalLatency = rawData.reduce((sum, item) => sum + item.latency, 0);
-            const avgLatency = totalLatency / rawData.length;
-
-            rawData.forEach((d, index) => {
-                const [indexA, indexB] = d.pair;
-                const weight = avgLatency / d.latency;
-                
-                csv += `${index + 1},"${CATEGORIES[indexA]}","${CATEGORIES[indexB]}",`;
-                csv += `${d.choiceType},${d.latency},${weight.toFixed(2)}\n`;
-            });
-            
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            if (link.download !== undefined) { 
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", "ai_utility_preference_data.csv");
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        }
-
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            startBtn.onclick = startComparison;
-            showStartScreen();
+// Full ranking likelihood; every observation is four ordered IDs. No timing data.
+const PL = {
+  precision: 0.5,
+  derivatives(u, rankings) {
+    const n=u.length;
+    let value=-0.5*this.precision*u.reduce((s,x)=>s+x*x,0);
+    const gradient=u.map(x=>-this.precision*x);
+    const information=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?this.precision:0));
+    for(const ranking of rankings) {
+      for(let stage=0;stage<ranking.length-1;stage++) {
+        const remaining=ranking.slice(stage), maximum=Math.max(...remaining.map(i=>u[i]));
+        const weights=remaining.map(i=>Math.exp(u[i]-maximum)), total=weights.reduce((a,b)=>a+b,0);
+        const probabilities=weights.map(x=>x/total);
+        value+=u[ranking[stage]]-maximum-Math.log(total);
+        gradient[ranking[stage]]++;
+        remaining.forEach((i,a)=>{
+          gradient[i]-=probabilities[a];
+          remaining.forEach((j,b)=>{information[i][j]+=(i===j?probabilities[a]:0)-probabilities[a]*probabilities[b];});
         });
+      }
+    }
+    return {value,gradient,information};
+  },
+  inverse(matrix) {
+    const n=matrix.length, lower=Array.from({length:n},()=>Array(n).fill(0));
+    for(let i=0;i<n;i++) for(let j=0;j<=i;j++) {
+      let value=matrix[i][j];
+      for(let k=0;k<j;k++) value-=lower[i][k]*lower[j][k];
+      lower[i][j]=i===j?Math.sqrt(Math.max(value,1e-12)):value/lower[j][j];
+    }
+    const inverse=Array.from({length:n},()=>Array(n).fill(0));
+    for(let column=0;column<n;column++) {
+      const forward=Array(n).fill(0), solution=Array(n).fill(0);
+      for(let i=0;i<n;i++) {
+        let value=i===column?1:0;
+        for(let k=0;k<i;k++) value-=lower[i][k]*forward[k];
+        forward[i]=value/lower[i][i];
+      }
+      for(let i=n-1;i>=0;i--) {
+        let value=forward[i];
+        for(let k=i+1;k<n;k++) value-=lower[k][i]*solution[k];
+        solution[i]=value/lower[i][i];
+      }
+      for(let i=0;i<n;i++) inverse[i][column]=solution[i];
+    }
+    return inverse;
+  },
+  fit(items,observations) {
+    const indices=new Map(items.map((item,i)=>[item.id,i]));
+    const rankings=observations.map(order=>order.map(id=>indices.get(id)))
+      .filter(order=>order.length===4 && new Set(order).size===4 && order.every(Number.isInteger));
+    let u=items.map(()=>0);
+    for(let iteration=0;iteration<250;iteration++) {
+      const current=this.derivatives(u,rankings);
+      if(Math.max(...current.gradient.map(Math.abs))<1e-7) break;
+      let step=1, accepted=false;
+      const norm=current.gradient.reduce((s,x)=>s+x*x,0);
+      for(let attempt=0;attempt<24;attempt++) {
+        const candidate=u.map((x,i)=>x+step*current.gradient[i]);
+        if(this.derivatives(candidate,rankings).value>=current.value+0.0001*step*norm) {
+          u=candidate; accepted=true; break;
+        }
+        step*=0.5;
+      }
+      if(!accepted) break;
+    }
+    const covariance=this.inverse(this.derivatives(u,rankings).information);
+    return {utilities:u, errors:u.map((_,i)=>Math.sqrt(Math.max(0,covariance[i][i])))};
+  }
+};
 
-    </script>
+function selectItems(items,observations,presentations,estimate,previous,random=Math.random) {
+  const appearances=items.map(item=>presentations.filter(round=>round.includes(item.id)).length);
+  const evidence=items.map(item=>observations.filter(round=>round.includes(item.id)).length);
+  const jitter=items.map(()=>random()*0.25), chosen=[];
+  const broad=observations.length<Math.max(2,Math.ceil(items.length/4));
+  while(chosen.length<4) {
+    let best=-1,bestValue=-Infinity;
+    items.forEach((item,i)=>{
+      if(chosen.includes(i)) return;
+      const novel=chosen.reduce((sum,j)=>sum+1/(1+observations.filter(round=>round.includes(item.id)&&round.includes(items[j].id)).length),0);
+      const uncertainty=estimate.errors[i]/Math.sqrt(1/PL.precision);
+      const value=(broad?6:2)/(1+appearances[i])+(evidence[i]===0?4:0)
+        +(broad?0:3*uncertainty)+1.2*novel-(previous.includes(item.id)&&items.length>4?0.8:0)+jitter[i];
+      if(value>bestValue) {best=i;bestValue=value;}
+    });
+    chosen.push(best);
+  }
+  const selected=chosen.map(i=>items[i].id);
+  for(let i=selected.length-1;i>0;i--) {const j=Math.floor(random()*(i+1));[selected[i],selected[j]]=[selected[j],selected[i]];}
+  return selected;
+}
+
+class DraftSession {
+  constructor(config,onChange=()=>{},haptic=()=>{}) {
+    this.config=config;this.onChange=onChange;this.haptic=haptic;this.timer=null;
+    this.restart();
+  }
+  validate() {
+    if(!Number.isInteger(this.config.rounds)||this.config.rounds<1) return 'Set rounds to a positive integer.';
+    if(!Array.isArray(this.config.items)||this.config.items.length<4) return 'Configure at least four items.';
+    if(this.config.items.some(item=>!item || typeof item.id!=='string' || !item.id || typeof item.name!=='string' || !item.name)) return 'Each item needs a nonempty ID and name.';
+    if(new Set(this.config.items.map(item=>item.id)).size!==this.config.items.length) return 'Item IDs must be unique.';
+    return null;
+  }
+  restart() {
+    this.cancel();this.error=this.validate();this.order=[];this.cards=[];this.history=[];
+    this.observations=[];this.presentations=[];this.skipped=0;this.finished=false;this.generation=0;
+    if(!this.error) {this.estimate=PL.fit(this.config.items,[]);this.next();}
+    this.onChange();
+  }
+  get completed() {return this.observations.length+this.skipped;}
+  cancel() {clearTimeout(this.timer);this.timer=null;}
+  next() {
+    this.cards=selectItems(this.config.items,this.observations,this.presentations,this.estimate,this.cards);
+    this.presentations.push([...this.cards]);this.order=[];this.history=[];this.generation++;
+  }
+  tap(id) {
+    if(this.finished||this.error||!this.cards.includes(id)) return;
+    this.cancel();this.history.push([...this.order]);
+    if(this.order.includes(id)) this.order=this.order.filter(x=>x!==id);
+    else this.order.push(id);
+    this.haptic(false);
+    if(this.order.length===4) this.timer=setTimeout(()=>this.commit(),650);
+    this.onChange();
+  }
+  undo() {
+    if(this.finished||!this.history.length) return;
+    this.cancel();this.order=this.history.pop();
+    if(this.order.length===4) this.timer=setTimeout(()=>this.commit(),650);
+    this.onChange();
+  }
+  reset() {
+    if(this.finished||!this.order.length) return;
+    this.cancel();this.history.push([...this.order]);this.order=[];this.onChange();
+  }
+  skip() {
+    if(this.finished||this.error) return;
+    this.cancel();this.skipped++;this.advance();
+  }
+  commit() {
+    if(this.finished||this.order.length!==4||new Set(this.order).size!==4||!this.order.every(id=>this.cards.includes(id))) return;
+    this.cancel();this.observations.push([...this.order]);
+    this.estimate=PL.fit(this.config.items,this.observations);this.haptic(true);this.advance();
+  }
+  advance() {
+    this.order=[];this.history=[];
+    if(this.completed>=this.config.rounds) this.finished=true;
+    else this.next();
+    this.onChange();
+  }
+  get scores() {
+    const observed=new Set(this.observations.flat());
+    const list=this.config.items.map((item,i)=>({...item,utility:this.estimate.utilities[i]}))
+      .filter(item=>observed.has(item.id)).sort((a,b)=>b.utility-a.utility);
+    return list.map((item,i)=>({...item,rank:i+1,strength:100*Math.exp(item.utility-list[0].utility)}));
+  }
+  get persona() {
+    const scores=this.scores;
+    if(!scores.length) return 'A taste still to discover';
+    if(scores.length>1 && scores[0].utility-scores[1].utility<0.05) return 'The Eclectic Player';
+    return scores[0].persona||'Your taste profile';
+  }
+  summary() {
+    return `${this.config.title}\n${this.persona}\n\n${this.scores.slice(0,3).map(item=>`${item.rank}. ${item.name}`).join('\n')}\n\n${this.observations.length} ranked rounds; ${this.skipped} skipped.\nBased on preference order alone.`;
+  }
+  csv() {
+    const quote=value=>'"'+String(value).replaceAll('"','""')+'"';
+    const lines=['rank,item_id,item,utility,relative_strength'];
+    this.scores.forEach(item=>lines.push([item.rank,quote(item.id),quote(item.name),item.utility,item.strength].join(',')));
+    lines.push('','round,rank_1_id,rank_2_id,rank_3_id,rank_4_id');
+    this.observations.forEach((order,i)=>lines.push([i+1,...order.map(quote)].join(',')));
+    lines.push('','ranked_rounds,skipped_rounds',`${this.observations.length},${this.skipped}`);
+    return lines.join('\r\n');
+  }
+}
+
+const $=id=>document.getElementById(id);
+let renderedGeneration=-1, renderedFinished=false;
+function vibrate(complete) {try {if(navigator.vibrate) navigator.vibrate(complete?[20,35,30]:8);} catch {} }
+let session;
+function render() {
+  if(!session) return;
+  $('error-view').hidden=!session.error;
+  $('round-view').hidden=!!session.error||session.finished;
+  $('results-view').hidden=!!session.error||!session.finished;
+  if(session.error) {$('error-message').textContent=session.error;return;}
+  if(session.finished) {
+    if(!renderedFinished) {renderResults();renderedFinished=true;}
+    return;
+  }
+  renderedFinished=false;
+  $('round-counter').textContent=`Round ${session.completed+1} of ${CONFIG.rounds}`;
+  $('progress').max=CONFIG.rounds;$('progress').value=session.completed;
+  $('progress').setAttribute('aria-valuetext',`${session.completed} of ${CONFIG.rounds} rounds complete`);
+  if(renderedGeneration!==session.generation) {
+    const firstRound=renderedGeneration===-1;
+    $('cards').replaceChildren();
+    session.cards.forEach(id=>{
+      const item=CONFIG.items.find(item=>item.id===id),button=document.createElement('button');
+      button.className='card';button.type='button';button.dataset.id=id;
+      const top=document.createElement('span');top.className='card-top';
+      const icon=document.createElement('span');icon.className='icon';icon.textContent=item.icon||'✦';icon.setAttribute('aria-hidden','true');
+      const badge=document.createElement('span');badge.className='badge';badge.setAttribute('aria-hidden','true');
+      const name=document.createElement('span');name.className='card-name';name.textContent=item.name;
+      top.append(icon,badge);button.append(top,name);button.addEventListener('click',()=>session.tap(id));$('cards').append(button);
+    });
+    $('cards').classList.remove('enter');void $('cards').offsetWidth;$('cards').classList.add('enter');
+    renderedGeneration=session.generation;
+    if(!firstRound) $('instruction').focus({preventScroll:true});
+  }
+  $('cards').querySelectorAll('button').forEach(button=>{
+    const rank=session.order.indexOf(button.dataset.id)+1;
+    const name=CONFIG.items.find(item=>item.id===button.dataset.id).name;
+    const badge=button.querySelector('.badge'),value=rank?String(rank):'';
+    if(badge.textContent!==value) {badge.classList.remove('pop');badge.textContent=value;if(rank) {void badge.offsetWidth;badge.classList.add('pop');}}
+    button.classList.toggle('ranked',!!rank);
+    button.setAttribute('aria-label',`${name}. ${rank?`Rank ${rank} of 4. Tap to remove rank.`:`Not ranked. Tap to assign rank ${session.order.length+1}.`}`);
+  });
+  $('rank-status').textContent=session.order.length===4?'Round complete — moving on…':`${session.order.length} of 4 ranked`;
+  $('undo').disabled=!session.history.length;$('reset').disabled=!session.order.length;
+}
+function scoreRow(item) {
+  const row=document.createElement('div');row.className='score-row';row.setAttribute('role','group');
+  row.setAttribute('aria-label',`${item.rank}. ${item.name}. Relative preference strength ${Math.round(item.strength)} out of 100.`);
+  const label=document.createElement('div');label.className='score-label';label.setAttribute('aria-hidden','true');
+  [['position',`${item.rank}.`],['score-name',item.name],['score-number',String(Math.round(item.strength))]].forEach(([cls,text])=>{
+    const span=document.createElement('span');span.className=cls;span.textContent=text;label.append(span);
+  });
+  const track=document.createElement('div');track.className='track';track.setAttribute('aria-hidden','true');
+  const fill=document.createElement('div');fill.className='fill';fill.style.width=`${item.strength}%`;track.append(fill);row.append(label,track);return row;
+}
+function renderResults() {
+  const scores=session.scores;
+  $('persona').textContent=session.persona;
+  $('profile-description').textContent=scores.length?
+    `${session.persona==='The Eclectic Player'?'Your leading picks are closely matched.':`Your draft puts ${scores[0].name.toLowerCase()} first.`} ${session.observations.length} rounds ranked · ${session.skipped} skipped · ${scores.length} of ${CONFIG.items.length} items compared.`:
+    'All rounds were skipped. Play again to discover your favorites.';
+  $('top-panel').hidden=$('full-panel').hidden=$('score-note').hidden=!scores.length;
+  $('top-scores').replaceChildren(...scores.slice(0,3).map(scoreRow));
+  $('all-scores').replaceChildren(...scores.map(scoreRow));
+  $('full-panel').open=false;$('share-status').textContent='';
+  $('persona').focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});
+}
+$('undo').addEventListener('click',()=>session.undo());
+$('reset').addEventListener('click',()=>session.reset());
+$('skip').addEventListener('click',()=>session.skip());
+$('restart').addEventListener('click',()=>{renderedGeneration=-1;renderedFinished=false;session.restart();$('instruction').focus({preventScroll:true});});
+$('export').addEventListener('click',()=>{
+  const blob=new Blob([session.csv()],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='sims-taste-draft.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+$('share').addEventListener('click',async()=>{
+  const text=session.summary();
+  try {
+    if(navigator.share) {await navigator.share({title:CONFIG.title,text});$('share-status').textContent='';}
+    else if(navigator.clipboard && window.isSecureContext) {await navigator.clipboard.writeText(text);$('share-status').textContent='Profile copied — paste it anywhere.';}
+    else {
+      const blob=new Blob([text],{type:'text/plain;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;a.download='sims-taste-profile.txt';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      $('share-status').textContent='Profile downloaded as a text file.';
+    }
+  } catch(error) {if(error.name!=='AbortError') $('share-status').textContent='Sharing was unavailable. Try downloading the CSV instead.';}
+});
+document.title=CONFIG.title;$('brand').textContent=CONFIG.title;
+session=new DraftSession(CONFIG,render,vibrate);render();
+</script>
 </body>
 </html>
