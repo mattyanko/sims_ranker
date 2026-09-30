@@ -73,7 +73,7 @@ details summary { min-height:44px; cursor:pointer; font-weight:600; }
 <header><span class="mark" aria-hidden="true">✦</span><span class="brand" id="brand">Sims Taste Draft</span></header>
 <section id="round-view" aria-labelledby="instruction">
   <div class="round-line"><span id="round-counter"></span><span>YOUR TASTE, YOUR RULES</span></div>
-  <progress id="progress" value="0" max="7" aria-label="Draft progress"></progress>
+  <progress id="progress" value="0" max="1" aria-label="Draft progress"></progress>
   <h1 id="instruction" tabindex="-1">Tap your favorites in order</h1>
   <p class="status muted" id="rank-status" role="status" aria-live="polite" aria-atomic="true">0 of 4 ranked</p>
   <div class="grid" id="cards"></div>
@@ -90,7 +90,7 @@ details summary { min-height:44px; cursor:pointer; font-weight:600; }
   </div>
   <div class="panel" id="top-panel"><h2>Your top picks</h2><div id="top-scores"></div></div>
   <details class="panel" id="full-panel"><summary>Full priority ranking</summary><div class="details-content" id="all-scores"></div></details>
-  <p class="footnote" id="score-note">Bars show relative preference strength, with your leading item set to 100. They aren’t confidence or liking percentages. Close scores can change with more rounds.</p>
+  <p class="footnote" id="score-note">Each appearance earns 3, 2, 1, or 0 points. Bars show average points on a 0–100 scale, not confidence or liking percentages. Equal averages share a rank; close scores are a rough preference snapshot.</p>
   <button class="primary" id="share">Share taste profile</button>
   <p id="share-status" class="share-status" role="status" aria-live="polite"></p>
   <button class="secondary wide" id="export">Download rankings (CSV)</button>
@@ -101,10 +101,10 @@ details summary { min-height:44px; cursor:pointer; font-weight:600; }
 </main>
 <script>
 'use strict';
-// RESKIN HERE: change this title, round count, and item set. IDs must be unique.
+// RESKIN HERE: change this title, target appearances (2 or 3), and item set. IDs must be unique.
 const CONFIG = {
   title: 'Sims Taste Draft',
-  rounds: 7,
+  targetAppearances: 3, // Rounds are calculated from item count; no manual round count.
   items: [
     {id:'building', name:'Building & creating', icon:'🏡', persona:'The Architect'},
     {id:'characters', name:'Character creation', icon:'🧑', persona:'The Character Designer'},
@@ -119,97 +119,48 @@ const CONFIG = {
   ]
 };
 
-// Full ranking likelihood; every observation is four ordered IDs. No timing data.
-const PL = {
-  precision: 0.5,
-  derivatives(u, rankings) {
-    const n=u.length;
-    let value=-0.5*this.precision*u.reduce((s,x)=>s+x*x,0);
-    const gradient=u.map(x=>-this.precision*x);
-    const information=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?this.precision:0));
-    for(const ranking of rankings) {
-      for(let stage=0;stage<ranking.length-1;stage++) {
-        const remaining=ranking.slice(stage), maximum=Math.max(...remaining.map(i=>u[i]));
-        const weights=remaining.map(i=>Math.exp(u[i]-maximum)), total=weights.reduce((a,b)=>a+b,0);
-        const probabilities=weights.map(x=>x/total);
-        value+=u[ranking[stage]]-maximum-Math.log(total);
-        gradient[ranking[stage]]++;
-        remaining.forEach((i,a)=>{
-          gradient[i]-=probabilities[a];
-          remaining.forEach((j,b)=>{information[i][j]+=(i===j?probabilities[a]:0)-probabilities[a]*probabilities[b];});
-        });
+// Build the entire schedule before any answers: ceil(items × target / 4) rounds.
+// Padding adds at most three slots; every item's exposure differs by at most one.
+function shuffle(values,random=Math.random) {
+  const result=[...values];
+  for(let i=result.length-1;i>0;i--) {const j=Math.floor(random()*(i+1));[result[i],result[j]]=[result[j],result[i]];}
+  return result;
+}
+function generateSchedule(items,targetAppearances,random=Math.random) {
+  if(items.length<4 || new Set(items.map(item=>item.id)).size!==items.length ||
+     !Number.isSafeInteger(targetAppearances) || targetAppearances<1) throw new Error('Invalid schedule configuration');
+  const ids=shuffle(items.map(item=>item.id),random),roundCount=Math.ceil(ids.length*targetAppearances/4);
+  // Any four consecutive IDs are distinct, including at cycle boundaries.
+  const rounds=Array.from({length:roundCount},(_,r)=>Array.from({length:4},(_,k)=>ids[(r*4+k)%ids.length]));
+  const schedule=shuffle(rounds,random);
+  function cost() {
+    const pairs=new Map(),parent=new Map(ids.map(id=>[id,id]));
+    function root(id) {while(parent.get(id)!==id) {parent.set(id,parent.get(parent.get(id)));id=parent.get(id);}return id;}
+    let repeats=0,adjacent=0;
+    schedule.forEach((round,r)=>{
+      for(let a=0;a<4;a++) for(let b=a+1;b<4;b++) {
+        const key=JSON.stringify([round[a],round[b]].sort()),count=pairs.get(key)||0;
+        repeats+=count;pairs.set(key,count+1);parent.set(root(round[a]),root(round[b]));
       }
-    }
-    return {value,gradient,information};
-  },
-  inverse(matrix) {
-    const n=matrix.length, lower=Array.from({length:n},()=>Array(n).fill(0));
-    for(let i=0;i<n;i++) for(let j=0;j<=i;j++) {
-      let value=matrix[i][j];
-      for(let k=0;k<j;k++) value-=lower[i][k]*lower[j][k];
-      lower[i][j]=i===j?Math.sqrt(Math.max(value,1e-12)):value/lower[j][j];
-    }
-    const inverse=Array.from({length:n},()=>Array(n).fill(0));
-    for(let column=0;column<n;column++) {
-      const forward=Array(n).fill(0), solution=Array(n).fill(0);
-      for(let i=0;i<n;i++) {
-        let value=i===column?1:0;
-        for(let k=0;k<i;k++) value-=lower[i][k]*forward[k];
-        forward[i]=value/lower[i][i];
-      }
-      for(let i=n-1;i>=0;i--) {
-        let value=forward[i];
-        for(let k=i+1;k<n;k++) value-=lower[k][i]*solution[k];
-        solution[i]=value/lower[i][i];
-      }
-      for(let i=0;i<n;i++) inverse[i][column]=solution[i];
-    }
-    return inverse;
-  },
-  fit(items,observations) {
-    const indices=new Map(items.map((item,i)=>[item.id,i]));
-    const rankings=observations.map(order=>order.map(id=>indices.get(id)))
-      .filter(order=>order.length===4 && new Set(order).size===4 && order.every(Number.isInteger));
-    let u=items.map(()=>0);
-    for(let iteration=0;iteration<250;iteration++) {
-      const current=this.derivatives(u,rankings);
-      if(Math.max(...current.gradient.map(Math.abs))<1e-7) break;
-      let step=1, accepted=false;
-      const norm=current.gradient.reduce((s,x)=>s+x*x,0);
-      for(let attempt=0;attempt<24;attempt++) {
-        const candidate=u.map((x,i)=>x+step*current.gradient[i]);
-        if(this.derivatives(candidate,rankings).value>=current.value+0.0001*step*norm) {
-          u=candidate; accepted=true; break;
-        }
-        step*=0.5;
-      }
-      if(!accepted) break;
-    }
-    const covariance=this.inverse(this.derivatives(u,rankings).information);
-    return {utilities:u, errors:u.map((_,i)=>Math.sqrt(Math.max(0,covariance[i][i])))};
-  }
-};
-
-function selectItems(items,observations,presentations,estimate,previous,random=Math.random) {
-  const appearances=items.map(item=>presentations.filter(round=>round.includes(item.id)).length);
-  const evidence=items.map(item=>observations.filter(round=>round.includes(item.id)).length);
-  const jitter=items.map(()=>random()*0.25), chosen=[];
-  const broad=observations.length<Math.max(2,Math.ceil(items.length/4));
-  while(chosen.length<4) {
-    let best=-1,bestValue=-Infinity;
-    items.forEach((item,i)=>{
-      if(chosen.includes(i)) return;
-      const novel=chosen.reduce((sum,j)=>sum+1/(1+observations.filter(round=>round.includes(item.id)&&round.includes(items[j].id)).length),0);
-      const uncertainty=estimate.errors[i]/Math.sqrt(1/PL.precision);
-      const value=(broad?6:2)/(1+appearances[i])+(evidence[i]===0?4:0)
-        +(broad?0:3*uncertainty)+1.2*novel-(previous.includes(item.id)&&items.length>4?0.8:0)+jitter[i];
-      if(value>bestValue) {best=i;bestValue=value;}
+      if(r>0) adjacent+=round.filter(id=>schedule[r-1].includes(id)).length;
     });
-    chosen.push(best);
+    const components=new Set(ids.map(root)).size;
+    return repeats+0.15*adjacent+(components-1)*ids.length*ids.length*10;
   }
-  const selected=chosen.map(i=>items[i].id);
-  for(let i=selected.length-1;i>0;i--) {const j=Math.floor(random()*(i+1));[selected[i],selected[j]]=[selected[j],selected[i]];}
-  return selected;
+  // Swap items between rounds: preserve exposure counts, discourage repeat pairs,
+  // and prioritize a connected comparison graph. This is a heuristic, not a BIBD.
+  let best=cost();
+  for(let attempt=0;attempt<Math.min(4000,roundCount*180);attempt++) {
+    const a=Math.floor(random()*roundCount),b=Math.floor(random()*roundCount);
+    if(a===b) continue;
+    const i=Math.floor(random()*4),j=Math.floor(random()*4),x=schedule[a][i],y=schedule[b][j];
+    if(x===y || schedule[a].includes(y) || schedule[b].includes(x)) continue;
+    schedule[a][i]=y;schedule[b][j]=x;
+    const next=cost();
+    if(next<=best) best=next;
+    else {schedule[a][i]=x;schedule[b][j]=y;}
+  }
+  return schedule.map(round=>shuffle(round,random));
 }
 
 class DraftSession {
@@ -218,7 +169,7 @@ class DraftSession {
     this.restart();
   }
   validate() {
-    if(!Number.isInteger(this.config.rounds)||this.config.rounds<1) return 'Set rounds to a positive integer.';
+    if(!Number.isSafeInteger(this.config.targetAppearances)||this.config.targetAppearances<1) return 'Set targetAppearances to a positive integer.';
     if(!Array.isArray(this.config.items)||this.config.items.length<4) return 'Configure at least four items.';
     if(this.config.items.some(item=>!item || typeof item.id!=='string' || !item.id || typeof item.name!=='string' || !item.name)) return 'Each item needs a nonempty ID and name.';
     if(new Set(this.config.items.map(item=>item.id)).size!==this.config.items.length) return 'Item IDs must be unique.';
@@ -226,14 +177,17 @@ class DraftSession {
   }
   restart() {
     this.cancel();this.error=this.validate();this.order=[];this.cards=[];this.history=[];
-    this.observations=[];this.presentations=[];this.skipped=0;this.finished=false;this.generation=0;
-    if(!this.error) {this.estimate=PL.fit(this.config.items,[]);this.next();}
+    this.observations=[];this.presentations=[];this.records=[];this.skipped=0;this.finished=false;this.generation=0;
+    this.schedule=[];
+    this.sessionId=globalThis.crypto?.randomUUID?.() || 'draft-'+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
+    if(!this.error) {this.schedule=generateSchedule(this.config.items,this.config.targetAppearances);this.next();}
     this.onChange();
   }
   get completed() {return this.observations.length+this.skipped;}
+  get roundLimit() {return this.schedule.length;}
   cancel() {clearTimeout(this.timer);this.timer=null;}
   next() {
-    this.cards=selectItems(this.config.items,this.observations,this.presentations,this.estimate,this.cards);
+    this.cards=[...this.schedule[this.completed]];
     this.presentations.push([...this.cards]);this.order=[];this.history=[];this.generation++;
   }
   tap(id) {
@@ -257,41 +211,60 @@ class DraftSession {
   }
   skip() {
     if(this.finished||this.error) return;
-    this.cancel();this.skipped++;this.advance();
+    this.cancel();this.records.push({round:this.completed+1,shown:[...this.cards],ranking:[],status:'skipped'});this.skipped++;this.advance();
   }
   commit() {
     if(this.finished||this.order.length!==4||new Set(this.order).size!==4||!this.order.every(id=>this.cards.includes(id))) return;
-    this.cancel();this.observations.push([...this.order]);
-    this.estimate=PL.fit(this.config.items,this.observations);this.haptic(true);this.advance();
+    this.cancel();this.records.push({round:this.completed+1,shown:[...this.cards],ranking:[...this.order],status:'ranked'});
+    this.observations.push([...this.order]);this.haptic(true);this.advance();
   }
   advance() {
     this.order=[];this.history=[];
-    if(this.completed>=this.config.rounds) this.finished=true;
+    if(this.completed>=this.roundLimit) this.finished=true;
     else this.next();
     this.onChange();
   }
   get scores() {
-    const observed=new Set(this.observations.flat());
-    const list=this.config.items.map((item,i)=>({...item,utility:this.estimate.utilities[i]}))
-      .filter(item=>observed.has(item.id)).sort((a,b)=>b.utility-a.utility);
-    return list.map((item,i)=>({...item,rank:i+1,strength:100*Math.exp(item.utility-list[0].utility)}));
+    const totals=new Map(this.config.items.map(item=>[item.id,{points:0,appearances:0}]));
+    this.observations.forEach(order=>order.forEach((id,position)=>{
+      const total=totals.get(id);total.points+=3-position;total.appearances++;
+    }));
+    const list=this.config.items.map(item=>{
+      const total=totals.get(item.id);
+      return {...item,...total,average:total.appearances?total.points/total.appearances:0};
+    }).filter(item=>item.appearances>0).sort((a,b)=>b.average-a.average);
+    let previousRank=0;
+    return list.map((item,i)=>{
+      const rank=i>0 && Math.abs(item.average-list[i-1].average)<1e-10?previousRank:i+1;
+      previousRank=rank;
+      return {...item,rank,strength:100*item.average/3};
+    });
   }
   get persona() {
     const scores=this.scores;
     if(!scores.length) return 'A taste still to discover';
-    if(scores.length>1 && scores[0].utility-scores[1].utility<0.05) return 'The Eclectic Player';
+    if(scores.length>1 && scores[0].average-scores[1].average<0.15) return 'The Eclectic Player';
     return scores[0].persona||'Your taste profile';
   }
   summary() {
-    return `${this.config.title}\n${this.persona}\n\n${this.scores.slice(0,3).map(item=>`${item.rank}. ${item.name}`).join('\n')}\n\n${this.observations.length} ranked rounds; ${this.skipped} skipped.\nBased on preference order alone.`;
+    return `${this.config.title}\n${this.persona}\n\n${this.scores.slice(0,3).map(item=>`${item.rank}. ${item.name}`).join('\n')}\n\n${this.observations.length} ranked rounds; ${this.skipped} skipped.\nBased on average rank points (3, 2, 1, 0); skipped rounds are excluded.`;
   }
   csv() {
     const quote=value=>'"'+String(value).replaceAll('"','""')+'"';
-    const lines=['rank,item_id,item,utility,relative_strength'];
-    this.scores.forEach(item=>lines.push([item.rank,quote(item.id),quote(item.name),item.utility,item.strength].join(',')));
-    lines.push('','round,rank_1_id,rank_2_id,rank_3_id,rank_4_id');
-    this.observations.forEach((order,i)=>lines.push([i+1,...order.map(quote)].join(',')));
-    lines.push('','ranked_rounds,skipped_rounds',`${this.observations.length},${this.skipped}`);
+    const lines=['session_id,item_count,target_appearances,scheduled_rounds',
+      [quote(this.sessionId),this.config.items.length,this.config.targetAppearances,this.roundLimit].join(','),
+      '', 'rank,item_id,item,completed_appearances,rank_points,average_points,score_0_to_100'];
+    this.scores.forEach(item=>lines.push([item.rank,quote(item.id),quote(item.name),item.appearances,item.points,item.average,item.strength].join(',')));
+    // Retain names, planned exposures, actual presentations, and zero-evidence items.
+    lines.push('', 'item_id,item,planned_appearances,shown_appearances,completed_appearances');
+    this.config.items.forEach(item=>lines.push([quote(item.id),quote(item.name),
+      this.schedule.filter(round=>round.includes(item.id)).length,
+      this.presentations.filter(round=>round.includes(item.id)).length,
+      this.observations.filter(round=>round.includes(item.id)).length].join(',')));
+    lines.push('', 'session_id,round,status,shown_1_id,shown_2_id,shown_3_id,shown_4_id,rank_1_id,rank_2_id,rank_3_id,rank_4_id');
+    this.records.forEach(record=>lines.push([quote(this.sessionId),record.round,record.status,
+      ...record.shown.map(quote),...Array.from({length:4},(_,i)=>quote(record.ranking[i]||''))].join(',')));
+    lines.push('', 'ranked_rounds,skipped_rounds',`${this.observations.length},${this.skipped}`);
     return lines.join('\r\n');
   }
 }
@@ -311,9 +284,9 @@ function render() {
     return;
   }
   renderedFinished=false;
-  $('round-counter').textContent=`Round ${session.completed+1} of ${CONFIG.rounds}`;
-  $('progress').max=CONFIG.rounds;$('progress').value=session.completed;
-  $('progress').setAttribute('aria-valuetext',`${session.completed} of ${CONFIG.rounds} rounds complete`);
+  $('round-counter').textContent=`Round ${session.completed+1} of ${session.roundLimit}`;
+  $('progress').max=session.roundLimit;$('progress').value=session.completed;
+  $('progress').setAttribute('aria-valuetext',`${session.completed} of ${session.roundLimit} rounds complete`);
   if(renderedGeneration!==session.generation) {
     const firstRound=renderedGeneration===-1;
     $('cards').replaceChildren();
@@ -343,7 +316,7 @@ function render() {
 }
 function scoreRow(item) {
   const row=document.createElement('div');row.className='score-row';row.setAttribute('role','group');
-  row.setAttribute('aria-label',`${item.rank}. ${item.name}. Relative preference strength ${Math.round(item.strength)} out of 100.`);
+  row.setAttribute('aria-label',`${item.rank}. ${item.name}. Average rank score ${Math.round(item.strength)} out of 100, from ${item.appearances} completed appearances.`);
   const label=document.createElement('div');label.className='score-label';label.setAttribute('aria-hidden','true');
   [['position',`${item.rank}.`],['score-name',item.name],['score-number',String(Math.round(item.strength))]].forEach(([cls,text])=>{
     const span=document.createElement('span');span.className=cls;span.textContent=text;label.append(span);
@@ -353,9 +326,10 @@ function scoreRow(item) {
 }
 function renderResults() {
   const scores=session.scores;
+  const tie=scores.length>1 && scores[0].rank===scores[1].rank;
   $('persona').textContent=session.persona;
   $('profile-description').textContent=scores.length?
-    `${session.persona==='The Eclectic Player'?'Your leading picks are closely matched.':`Your draft puts ${scores[0].name.toLowerCase()} first.`} ${session.observations.length} rounds ranked · ${session.skipped} skipped · ${scores.length} of ${CONFIG.items.length} items compared.`:
+    `${tie?'Your leading picks share the top rank.':session.persona==='The Eclectic Player'?'Your leading picks are closely matched.':`Your draft puts ${scores[0].name.toLowerCase()} first.`} ${session.observations.length} rounds ranked · ${session.skipped} skipped · ${scores.length} of ${CONFIG.items.length} items compared.`:
     'All rounds were skipped. Play again to discover your favorites.';
   $('top-panel').hidden=$('full-panel').hidden=$('score-note').hidden=!scores.length;
   $('top-scores').replaceChildren(...scores.slice(0,3).map(scoreRow));
